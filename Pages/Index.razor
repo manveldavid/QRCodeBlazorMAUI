@@ -1,0 +1,95 @@
+﻿@page "/"
+@using CommunityToolkit.Maui.Storage
+@using SkiaSharp
+@using ZXing.QrCode
+@using QRCoder
+@inject IFileSaver FileSaver
+
+<RadzenStack 
+    Style="height:100%; width:100%"
+    AlignItems="AlignItems.Center" 
+    JustifyContent="JustifyContent.Center">
+        <img 
+            style="Width:80%;"
+            alt="qrcode" 
+            src="@($"data:image/png;base64,{Convert.ToBase64String(QrCodeImage)}")"
+            onclick="@(() => ImageClick())" />
+        <RadzenStack 
+            Style="width:100%;"
+            Orientation="Orientation.Horizontal">
+                <InputFile 
+                    OnChange="@(args => LoadImage(args))" />
+                <RadzenButton 
+                    Icon="qr_code" 
+                    Click="@MakeQRClick" />
+                <RadzenButton 
+                    Icon="download" 
+                    Click="@SaveClick" />
+        </RadzenStack>
+        <RadzenTextArea @bind-Value="@QrText" Style="width:80%; height:300px; padding:20px;" />
+</RadzenStack>
+
+@code{
+    byte[] QrCodeImage { get; set; } = new byte[0];
+    string QrText { get; set; }
+
+    async Task SaveClick(MouseEventArgs e)
+    {
+        var ms = new MemoryStream(QrCodeImage);
+        await FileSaver.SaveAsync("qrCode.png", ms, CancellationToken.None);
+    }
+
+    void ImageClick()
+    {
+        if (QrCodeImage.Length < 1) return;
+        var reader = new ZXing.SkiaSharp.BarcodeReader();
+        var btm = SKBitmap.Decode(QrCodeImage);
+        QrText = reader.Decode(btm).Text;
+    }
+
+    async Task LoadImage(InputFileChangeEventArgs args)
+    {
+        var ms = new MemoryStream();
+        await args.File.OpenReadStream().CopyToAsync(ms);
+        QrCodeImage = ms.ToArray();
+        ImageClick();
+        StateHasChanged();
+    }
+
+    void MakeQRClick(MouseEventArgs e)
+    {
+        var options = new QrCodeEncodingOptions()
+        {
+            DisableECI = true,
+            CharacterSet = "UTF-8",
+                Width = 500,
+                Height = 500,
+        };
+
+        var writer = new ZXing.SkiaSharp.BarcodeWriter()
+        {
+            Format = ZXing.BarcodeFormat.QR_CODE,
+            Options = options
+        };
+
+        if (string.IsNullOrEmpty(QrText))
+        {
+            QrCodeImage = new byte[0];
+        }
+        else
+        {
+            try
+            {
+                var qrCodeBitmap = writer.Write(QrText);
+                QrCodeImage = qrCodeBitmap.Encode(SKEncodedImageFormat.Png, 100).ToArray();
+            }
+            catch
+            {
+                QrCodeImage = new byte[0];
+                QrText = QrText + "too big";
+            }
+        }
+
+        StateHasChanged();
+    }
+}
