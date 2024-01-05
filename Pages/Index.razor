@@ -16,15 +16,31 @@
             onclick="@(() => ImageClick())" />
         <RadzenStack 
             Style="width:100%;"
+            AlignItems="AlignItems.Center"
+            JustifyContent="JustifyContent.Center"
             Orientation="Orientation.Horizontal">
                 <InputFile 
-                    OnChange="@(args => LoadImage(args))" />
+                    OnChange="@(args => LoadImage(args))" 
+                    id="FileInput"
+                    hidden/>
+                <label class="rz-button rz-button-md rz-variant-filled rz-shade-default rz-primary"
+                       for="FileInput"
+                       style="height:1rem; width:1rem; padding:0.5rem;">
+                    <span class="rz-button-box">
+                        <i class="rz-button-icon-left rzi">
+                            upload
+                        </i>
+                    </span>
+                </label>
                 <RadzenButton 
                     Icon="qr_code" 
                     Click="@MakeQRClick" />
                 <RadzenButton 
                     Icon="download" 
                     Click="@SaveClick" />
+                <RadzenButton 
+                    Icon="photo" 
+                    Click="@TakePhotoClick" />
         </RadzenStack>
         <RadzenTextArea @bind-Value="@QrText" Style="width:80%; height:300px; padding:20px;" />
 </RadzenStack>
@@ -32,6 +48,23 @@
 @code{
     byte[] QrCodeImage { get; set; } = new byte[0];
     string QrText { get; set; }
+
+    async Task TakePhotoClick(MouseEventArgs e)
+    {
+        if (MediaPicker.Default.IsCaptureSupported)
+        {
+            FileResult photo = await MediaPicker.Default.CapturePhotoAsync();
+
+            if (photo != null)
+            {
+                var ms = new MemoryStream();
+                await (await photo.OpenReadAsync()).CopyToAsync(ms);
+                QrCodeImage = ms.ToArray();
+                ImageClick();
+                StateHasChanged();
+            }
+        }
+    }
 
     async Task SaveClick(MouseEventArgs e)
     {
@@ -44,7 +77,14 @@
         if (QrCodeImage.Length < 1) return;
         var reader = new ZXing.SkiaSharp.BarcodeReader();
         var btm = SKBitmap.Decode(QrCodeImage);
-        QrText = reader.Decode(btm).Text;
+        try
+        {
+            QrText = reader.Decode(btm).Text;
+        }
+        catch
+        {
+            QrText = string.Empty;
+        }
     }
 
     async Task LoadImage(InputFileChangeEventArgs args)
